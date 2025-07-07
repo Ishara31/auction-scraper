@@ -7,6 +7,85 @@
     "start": "electron .",
     "dev": "electron . --dev",
     "web": "node src/web-server.js",
+    "build": "electron-builder --config.win.certificateFile=null --config.win.certificatePassword=null",
+    "build-win": "electron-builder --win --config.win.certificateFile=null --config.win.certificatePassword=null",
+    "build-mac": "electron-builder --mac",
+    "build-linux": "electron-builder --linux",
+    "pack": "electron-builder --dir",
+    "postinstall": "electron-builder install-app-deps",
+    "dist": "npm run build"
+  },
+  "keywords": ["auction", "scraper", "electron", "playwright", "web"],
+  "author": "Your Name",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^28.1.0",
+    "electron-builder": "^24.9.1"
+  },
+  "dependencies": {
+    "playwright": "^1.41.0",
+    "xlsx": "^0.18.5",
+    "express": "^4.18.2"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "build": {
+    "appId": "com.auction.scraper",
+    "productName": "Auction Bid History Scraper",
+    "directories": {
+      "output": "dist"
+    },
+    "files": ["src/**/*", "assets/**/*", "node_modules/**/*", "package.json"],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        },
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ],
+      "requestedExecutionLevel": "asInvoker"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Auction Scraper"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["x64", "arm64"]
+        }
+      ],
+      "category": "public.app-category.productivity"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": ["x64"]
+        }
+      ],
+      "category": "Office"
+    }
+  }
+}
+{
+  "name": "auction-bid-history-scraper",
+  "version": "1.0.0",
+  "description": "Desktop and web application for scraping auction bid history",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "web": "node src/web-server.js",
     "build": "electron-builder",
     "build-win": "electron-builder --win",
     "build-mac": "electron-builder --mac",
