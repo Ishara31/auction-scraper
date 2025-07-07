@@ -1,0 +1,12 @@
+version: '3.8'
+services:
+  auction-scraper:
+    build: .
+    volumes:
+      - ./data:/app/data
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+    environment:
+      - DISPLAY=${DISPLAY}
+    ports:
+      - "3000:3000"
+    restart: unless-stopped

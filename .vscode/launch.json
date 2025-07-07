@@ -1,0 +1,27 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Launch Desktop App",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/node_modules/.bin/electron",
+      "args": ["${workspaceFolder}/src/main.js"],
+      "console": "integratedTerminal",
+      "env": {
+        "NODE_ENV": "development"
+      }
+    },
+    {
+      "name": "Launch Web Server",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/src/web-server.js",
+      "console": "integratedTerminal",
+      "env": {
+        "NODE_ENV": "development",
+        "PORT": "3000"
+      }
+    }
+  ]
+}

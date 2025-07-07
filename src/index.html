@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auction Bid History Scraper</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🏛️ Auction Bid History Scraper</h1>
+            <p>Automated extraction of auction bid history data</p>
+        </header>
+
+        <main>
+            <div class="config-section">
+                <h2>Configuration</h2>
+                
+                <div class="form-group">
+                    <label for="auctionUrl">Auction System URL:</label>
+                    <input type="url" id="auctionUrl" placeholder="https://smartauction.okloapps.com/Reports/BidHistoryReport" 
+                           value="https://smartauction.okloapps.com/Reports/BidHistoryReport">
+                </div>
+
+                <div class="form-group">
+                    <label for="saveDirectory">Save Directory:</label>
+                    <div class="directory-selector">
+                        <input type="text" id="saveDirectory" placeholder="Select directory to save files..." readonly>
+                        <button id="selectDirectory" type="button">Browse</button>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="maxButtons">Max Buttons to Process:</label>
+                        <input type="number" id="maxButtons" value="1000" min="1" max="10000">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="batchSize">Batch Size:</label>
+                        <input type="number" id="batchSize" value="5" min="1" max="20">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="headlessMode"> Run in headless mode (faster, no browser window)
+                    </label>
+                </div>
+
+                <div class="control-buttons">
+                    <button id="startScraping" class="btn-primary">🚀 Start Scraping</button>
+                    <button id="stopScraping" class="btn-secondary" disabled>⏹️ Stop Scraping</button>
+                </div>
+
+                <!-- Continue button section - separate and always visible when scraping -->
+                <div id="continueSection" class="continue-section" style="display: none;">
+                    <div class="continue-instructions">
+                        <h3>📋 Ready to Continue?</h3>
+                        <p>After completing login and search setup, click the button below:</p>
+                    </div>
+                    <button id="continueButton" class="btn-continue-large">✅ Continue Extraction</button>
+                </div>
+            </div>
+
+            <div class="status-section">
+                <h2>Status</h2>
+                <div class="status-info">
+                    <div class="status-item">
+                        <span class="label">Status:</span>
+                        <span id="currentStatus" class="status-idle">Idle</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="label">Buttons Processed:</span>
+                        <span id="buttonsProcessed">0</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="label">API Calls:</span>
+                        <span id="apiCalls">0</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="label">Unique Auctions:</span>
+                        <span id="uniqueAuctions">0</span>
+                    </div>
+                </div>
+
+                <div class="progress-container">
+                    <div class="progress-bar">
+                        <div id="progressFill" class="progress-fill"></div>
+                    </div>
+                    <span id="progressText">0%</span>
+                </div>
+            </div>
+
+            <div class="log-section">
+                <h2>Activity Log</h2>
+                <div id="logContainer" class="log-container">
+                    <div class="log-entry">
+                        <span class="timestamp">[Ready]</span>
+                        <span class="message">Application started. Configure settings and click "Start Scraping" to begin.</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="results-section" id="resultsSection" style="display: none;">
+                <h2>Results</h2>
+                <div class="results-summary">
+                    <div class="result-item">
+                        <span class="label">Total Records:</span>
+                        <span id="totalRecords">0</span>
+                    </div>
+                    <div class="result-item">
+                        <span class="label">Excel File:</span>
+                        <span id="excelFile">-</span>
+                    </div>
+                    <div class="result-item">
+                        <span class="label">JSON File:</span>
+                        <span id="jsonFile">-</span>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="renderer.js"></script>
+</body>
+</html>
