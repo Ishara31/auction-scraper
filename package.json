@@ -7,8 +7,8 @@
     "start": "electron .",
     "dev": "electron . --dev",
     "web": "node src/web-server.js",
-    "build": "electron-builder --config.win.certificateFile=null --config.win.certificatePassword=null",
-    "build-win": "electron-builder --win --config.win.certificateFile=null --config.win.certificatePassword=null",
+    "build": "electron-builder",
+    "build-win": "electron-builder --win",
     "build-mac": "electron-builder --mac",
     "build-linux": "electron-builder --linux",
     "pack": "electron-builder --dir",
@@ -36,7 +36,11 @@
     "directories": {
       "output": "dist"
     },
-    "files": ["src/**/*", "node_modules/**/*", "package.json"],
+    "files": [
+      "src/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
     "win": {
       "target": [
         {
@@ -48,7 +52,9 @@
           "arch": ["x64"]
         }
       ],
-      "requestedExecutionLevel": "asInvoker"
+      "requestedExecutionLevel": "asInvoker",
+      "sign": false,
+      "publisherName": "Your Name or Company"
     },
     "nsis": {
       "oneClick": false,
