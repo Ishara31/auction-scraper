@@ -53,7 +53,10 @@
         }
       ],
       "requestedExecutionLevel": "asInvoker",
-      "sign": false,
+      "sign": null,
+      "certificateFile": null,
+      "certificatePassword": null,
+      "verifyUpdateCodeSignature": false,
       "publisherName": "Your Name or Company"
     },
     "nsis": {
@@ -61,7 +64,8 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Auction Scraper"
+      "shortcutName": "Auction Scraper",
+      "differentialPackage": false
     },
     "mac": {
       "target": [
