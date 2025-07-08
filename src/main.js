@@ -14,7 +14,7 @@ function createWindow() {
       contextIsolation: true,
       preload: path.join(__dirname, "preload.js"),
     },
-    icon: path.join(__dirname, "../assets/icon.png"),
+    icon: path.join(__dirname, "../assets/ctb.jpg"),
   })
 
   mainWindow.loadFile("src/index.html")
@@ -28,6 +28,10 @@ function createWindow() {
 app.whenReady().then(createWindow)
 
 app.on("window-all-closed", () => {
+  // Clean up scraper when app is closing
+  if (scraper) {
+    scraper.cleanup()
+  }
   if (process.platform !== "darwin") {
     app.quit()
   }
@@ -42,38 +46,79 @@ app.on("activate", () => {
 // IPC handlers
 ipcMain.handle("start-scraping", async (event, config) => {
   try {
-    scraper = new AuctionScraper(config)
+    // Check if this is for next category or first time
+    if (scraper && scraper.isWaitingForNextCategory) {
+      // This is for next category - call startNextCategory
+      console.log("Starting next category...")
 
-    // Set up progress callbacks
-    scraper.onProgress = (progress) => {
-      mainWindow.webContents.send("scraping-progress", progress)
-    }
+      // Update config for existing scraper
+      scraper.config = config
 
-    scraper.onLog = (log) => {
-      mainWindow.webContents.send("scraping-log", log)
-    }
+      // Set up progress callbacks (in case they were lost)
+      scraper.onProgress = (progress) => {
+        mainWindow.webContents.send("scraping-progress", progress)
+      }
 
-    scraper.onComplete = (result) => {
-      mainWindow.webContents.send("scraping-complete", result)
-    }
+      scraper.onLog = (log) => {
+        mainWindow.webContents.send("scraping-log", log)
+      }
 
-    scraper.onError = (error) => {
-      mainWindow.webContents.send("scraping-error", error)
-    }
-
-    scraper.onWaitingForUser = () => {
-      mainWindow.webContents.send("waiting-for-user-continue")
-    }
-
-    // Start the scraper in background
-    scraper
-      .start()
-      .then((result) => {
+      scraper.onComplete = (result) => {
         mainWindow.webContents.send("scraping-complete", result)
-      })
-      .catch((error) => {
-        mainWindow.webContents.send("scraping-error", error.message)
-      })
+      }
+
+      scraper.onError = (error) => {
+        mainWindow.webContents.send("scraping-error", error)
+      }
+
+      scraper.onWaitingForUser = () => {
+        mainWindow.webContents.send("waiting-for-user-continue")
+      }
+
+      // Start next category
+      scraper
+        .startNextCategory()
+        .then((result) => {
+          mainWindow.webContents.send("scraping-complete", result)
+        })
+        .catch((error) => {
+          mainWindow.webContents.send("scraping-error", error.message)
+        })
+    } else {
+      // Create new scraper for first time
+      scraper = new AuctionScraper(config)
+
+      // Set up progress callbacks
+      scraper.onProgress = (progress) => {
+        mainWindow.webContents.send("scraping-progress", progress)
+      }
+
+      scraper.onLog = (log) => {
+        mainWindow.webContents.send("scraping-log", log)
+      }
+
+      scraper.onComplete = (result) => {
+        mainWindow.webContents.send("scraping-complete", result)
+      }
+
+      scraper.onError = (error) => {
+        mainWindow.webContents.send("scraping-error", error)
+      }
+
+      scraper.onWaitingForUser = () => {
+        mainWindow.webContents.send("waiting-for-user-continue")
+      }
+
+      // Start the scraper in background (first time)
+      scraper
+        .start()
+        .then((result) => {
+          mainWindow.webContents.send("scraping-complete", result)
+        })
+        .catch((error) => {
+          mainWindow.webContents.send("scraping-error", error.message)
+        })
+    }
 
     return { success: true, message: "Scraping started" }
   } catch (error) {

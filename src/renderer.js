@@ -2,6 +2,7 @@ class AuctionScraperUI {
   constructor() {
     this.isScrapingActive = false
     this.isWaitingForUser = false
+    this.isNextCategory = false
     this.initializeElements()
     this.setupEventListeners()
     this.setupIPCListeners()
@@ -41,7 +42,7 @@ class AuctionScraperUI {
   setupEventListeners() {
     this.startButton.addEventListener("click", () => this.startScraping())
     this.stopButton.addEventListener("click", () => this.stopScraping())
-    this.continueButton.addEventListener("click", () => this.userContinue())
+    this.continueButton.addEventListener("click", () => this.handleContinueClick())
     this.selectDirectoryButton.addEventListener("click", () => this.selectSaveDirectory())
   }
 
@@ -100,6 +101,7 @@ class AuctionScraperUI {
     }
 
     this.isScrapingActive = true
+    this.isNextCategory = false
     // Show continue section immediately when scraping starts
     this.continueSection.style.display = "block"
     this.addLogEntry({
@@ -116,6 +118,47 @@ class AuctionScraperUI {
       }
     } catch (error) {
       this.handleScrapingError(error.message)
+    }
+  }
+
+  async handleContinueClick() {
+    if (this.isNextCategory) {
+      // This is for starting next category
+      await this.startNextCategory()
+    } else {
+      // This is for continuing current extraction
+      await this.userContinue()
+    }
+  }
+
+  async startNextCategory() {
+    this.addLogEntry({ type: "info", message: "🔄 Starting next category extraction..." })
+
+    // Update button to show it's processing
+    this.continueButton.textContent = "⏳ Starting Next Category..."
+    this.continueButton.disabled = true
+
+    // Reset the next category flag
+    this.isNextCategory = false
+
+    const config = {
+      auctionUrl: this.auctionUrlInput.value.trim(),
+      saveDirectory: this.saveDirectoryInput.value.trim(),
+      maxButtons: Number.parseInt(this.maxButtonsInput.value) || 1000,
+      batchSize: Number.parseInt(this.batchSizeInput.value) || 5,
+      headless: this.headlessModeCheckbox.checked,
+    }
+
+    try {
+      const result = await window.electronAPI.startScraping(config)
+      if (result.success) {
+        this.addLogEntry({ type: "success", message: "✅ Next category extraction started!" })
+      }
+    } catch (error) {
+      this.addLogEntry({ type: "error", message: `Error starting next category: ${error.message}` })
+      this.continueButton.textContent = "✅ Continue with Next Category"
+      this.continueButton.disabled = false
+      this.isNextCategory = true
     }
   }
 
@@ -147,9 +190,19 @@ class AuctionScraperUI {
     this.continueSection.style.display = "block"
     this.currentStatusSpan.textContent = "Waiting for User"
     this.currentStatusSpan.className = "status-running"
+
+    // Reset continue button state
+    if (this.isNextCategory) {
+      this.continueButton.textContent = "✅ Continue Extraction"
+    } else {
+      this.continueButton.textContent = "✅ Continue Extraction"
+    }
+    this.continueButton.disabled = false
+
     this.addLogEntry({
       type: "success",
-      message: "✅ Browser ready! Complete your login and search steps, then click the Continue button below.",
+      message:
+        "✅ Browser ready! Complete your category selection and search steps, then click the Continue button below.",
     })
   }
 
@@ -169,6 +222,7 @@ class AuctionScraperUI {
 
     this.isScrapingActive = false
     this.isWaitingForUser = false
+    this.isNextCategory = false
     this.updateScrapingState(false)
   }
 
@@ -223,14 +277,17 @@ class AuctionScraperUI {
   }
 
   handleScrapingComplete(result) {
-    this.isScrapingActive = false
+    // Don't set isScrapingActive to false - keep it active for next category
     this.isWaitingForUser = false
-    this.updateScrapingState(false)
 
-    this.currentStatusSpan.textContent = "Complete"
+    this.currentStatusSpan.textContent = "Category Complete - Ready for Next"
     this.currentStatusSpan.className = "status-complete"
 
-    this.addLogEntry({ type: "success", message: "Scraping completed successfully!" })
+    this.addLogEntry({ type: "success", message: "✅ Category scraping completed successfully!" })
+    this.addLogEntry({
+      type: "info",
+      message: "🔄 Browser is still open. Select another category and click Continue to scrape more data.",
+    })
 
     // Show results
     this.resultsSection.style.display = "block"
@@ -241,11 +298,27 @@ class AuctionScraperUI {
     // Update progress to 100%
     this.progressFill.style.width = "100%"
     this.progressText.textContent = "100%"
+
+    // Show continue section for next category
+    this.continueSection.style.display = "block"
+    this.continueButton.textContent = "✅ Continue with Next Category"
+    this.continueButton.disabled = false
+    this.isNextCategory = true // Set flag for next category
+
+    // Reset progress for next category after a short delay
+    setTimeout(() => {
+      this.progressFill.style.width = "0%"
+      this.progressText.textContent = "0%"
+      this.buttonsProcessedSpan.textContent = "0"
+      this.apiCallsSpan.textContent = "0"
+      this.uniqueAuctionsSpan.textContent = "0"
+    }, 3000)
   }
 
   handleScrapingError(error) {
     this.isScrapingActive = false
     this.isWaitingForUser = false
+    this.isNextCategory = false
     this.updateScrapingState(false)
 
     this.currentStatusSpan.textContent = "Error"
