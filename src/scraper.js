@@ -13,6 +13,8 @@ class AuctionScraper {
     this.apiCallCount = 0
     this.processedButtons = 0
     this.isRunning = false
+    this.isInitialized = false
+    this.isWaitingForNextCategory = false
 
     // Callbacks
     this.onProgress = null
@@ -43,7 +45,25 @@ class AuctionScraper {
     }
   }
 
-  // Function to save data - EXACT copy from your original code
+  // Reset state for next category without closing browser
+  resetForNextCategory() {
+    this.log("🔄 Resetting scraper state for next category...")
+
+    // Reset counters and data
+    this.collectedData = []
+    this.processedAuctionIds = new Map()
+    this.apiCallCount = 0
+    this.processedButtons = 0
+    this.isRunning = false
+    this.isWaitingForNextCategory = true
+
+    // Reset user continue resolver
+    this.userContinueResolver = null
+
+    this.log("✅ Scraper state reset complete. Ready for next category.")
+  }
+
+  // Function to save data
   saveData() {
     this.log(`📊 Preparing data export...`)
     this.log(`📊 Total buttons processed: ${this.processedButtons}`)
@@ -181,30 +201,50 @@ class AuctionScraper {
   async start() {
     try {
       this.isRunning = true
-      this.log("🚀 Initializing auction scraper...")
 
-      this.browser = await chromium.launch({
-        headless: this.config.headless,
-      })
+      // Initialize browser only if not already initialized
+      if (!this.isInitialized) {
+        this.log("🚀 Initializing auction scraper...")
 
-      const context = await this.browser.newContext()
-      this.page = await context.newPage()
+        this.browser = await chromium.launch({
+          headless: this.config.headless,
+        })
 
-      this.setupAPIInterceptor()
+        const context = await this.browser.newContext()
+        this.page = await context.newPage()
 
-      this.log("🌐 Navigating to auction page...")
-      await this.page.goto(this.config.auctionUrl)
+        this.setupAPIInterceptor()
 
-      // EXACT same approach as your original script
-      this.log("👉 Please log in manually and click 'Continue' button to proceed...")
-      this.log("📋 STEPS TO FOLLOW:")
-      this.log("   1. Complete the login process in the browser")
-      this.log("   2. Select Year from dropdown")
-      this.log("   3. Select Catalogue from dropdown")
-      this.log("   4. Select Auction from dropdown")
-      this.log("   5. Click the Search button")
-      this.log("   6. Wait for results to appear")
-      this.log("   7. Click the 'Continue Extraction' button in the application")
+        this.log("🌐 Navigating to auction page...")
+        await this.page.goto(this.config.auctionUrl)
+
+        this.isInitialized = true
+      } else {
+        this.log("🔄 Using existing browser session...")
+      }
+
+      // Different messages for first time vs next category
+      if (this.isWaitingForNextCategory) {
+        this.log("👉 Please select your next category and click 'Continue' button to proceed...")
+        this.log("📋 STEPS TO FOLLOW:")
+        this.log("   1. Select Year from dropdown (if needed)")
+        this.log("   2. Select Catalogue from dropdown (if needed)")
+        this.log("   3. Select Auction from dropdown (if needed)")
+        this.log("   4. Click the Search button")
+        this.log("   5. Wait for results to appear")
+        this.log("   6. Click the 'Continue Extraction' button in the application")
+      } else {
+        this.log("👉 Please complete login and select your category, then click 'Continue' button to proceed...")
+        this.log("📋 STEPS TO FOLLOW:")
+        this.log("   1. Complete the login process in the browser")
+        this.log("   2. Select Year from dropdown")
+        this.log("   3. Select Catalogue from dropdown")
+        this.log("   4. Select Auction from dropdown")
+        this.log("   5. Click the Search button")
+        this.log("   6. Wait for results to appear")
+        this.log("   7. Click the 'Continue Extraction' button in the application")
+      }
+
       this.log("💡 You can stop the script anytime with the Stop button and data will be saved automatically!")
 
       // Notify UI that we're waiting for user
@@ -217,14 +257,17 @@ class AuctionScraper {
 
       this.log("✅ User confirmed! Starting data extraction...")
 
-      // Set maximum page size - EXACT copy from your original code
+      // Set maximum page size
       await this.setMaxPageSize()
 
-      // Start processing buttons - EXACT copy from your original code
+      // Start processing buttons
       await this.processAllButtons()
 
       // Save data
       const result = this.saveData()
+
+      // Reset state for next category but keep browser open
+      this.resetForNextCategory()
 
       if (this.onComplete) {
         this.onComplete(result)
@@ -237,12 +280,55 @@ class AuctionScraper {
         this.onError(error.message)
       }
       throw error
-    } finally {
-      await this.cleanup()
     }
   }
 
-  // Simple wait for user confirmation - same as your original script
+  // Method to start next category - called when user clicks continue for next category
+  async startNextCategory() {
+    try {
+      this.log("🔄 Starting next category extraction...")
+
+      // Reset the waiting flag and start running
+      this.isWaitingForNextCategory = false
+      this.isRunning = true
+
+      // Notify UI that we're waiting for user to select category
+      if (this.onWaitingForUser) {
+        this.onWaitingForUser()
+      }
+
+      // Wait for user to click continue button
+      await this.waitForUserContinue()
+
+      this.log("✅ User confirmed! Starting data extraction for next category...")
+
+      // Set maximum page size
+      await this.setMaxPageSize()
+
+      // Start processing buttons
+      await this.processAllButtons()
+
+      // Save data
+      const result = this.saveData()
+
+      // Reset state for next category but keep browser open
+      this.resetForNextCategory()
+
+      if (this.onComplete) {
+        this.onComplete(result)
+      }
+
+      return result
+    } catch (error) {
+      this.log(`❌ Error during next category scraping: ${error.message}`, "error")
+      if (this.onError) {
+        this.onError(error.message)
+      }
+      throw error
+    }
+  }
+
+  // Simple wait for user confirmation
   async waitForUserContinue() {
     return new Promise((resolve) => {
       this.userContinueResolver = resolve
@@ -257,7 +343,7 @@ class AuctionScraper {
     }
   }
 
-  // Enhanced API response interceptor - EXACT copy from your original code
+  // Enhanced API response interceptor
   setupAPIInterceptor() {
     this.page.on("response", async (response) => {
       const url = response.url()
@@ -269,14 +355,14 @@ class AuctionScraper {
         "/api/AuctionItemBid/get-bid-history/",
         "/api/Bidder/get-bidder-info/",
         "/api/Auction/get-item-details/",
-        "/api/reports/", // Often pagination APIs are under reports
-        "/api/datatable/", // DataTables API
-        "/api/search/", // Search/filter APIs
+        "/api/reports/",
+        "/api/datatable/",
+        "/api/search/",
       ]
       const isRelevantEndpoint = relevantEndpoints.some((endpoint) => url.includes(endpoint))
 
       if (isRelevantEndpoint) {
-        this.apiCallCount++ // Increment only for relevant API calls
+        this.apiCallCount++
         this.log(`🔍 API Call #${this.apiCallCount}: ${url}`)
 
         let auctionId = null
@@ -296,15 +382,14 @@ class AuctionScraper {
             urlObj.searchParams.get("auctionId") ||
             urlObj.searchParams.get("itemId") ||
             urlObj.searchParams.get("id") ||
-            urlObj.searchParams.get("draw") || // DataTables draw parameter
-            `api_call_${this.apiCallCount}` // Fallback identifier
+            urlObj.searchParams.get("draw") ||
+            `api_call_${this.apiCallCount}`
         }
 
         try {
           const json = await response.json()
           const endpoint = relevantEndpoints.find((ep) => url.includes(ep)) || "unknown"
 
-          // Log response details
           const recordCount = Array.isArray(json)
             ? json.length
             : json.data
@@ -315,7 +400,6 @@ class AuctionScraper {
 
           this.log(`📊 Response for ID ${auctionId}: ${recordCount} records`)
 
-          // Check for pagination indicators
           if (json.recordsTotal || json.recordsFiltered || json.totalRecords || json.draw) {
             this.log(
               `📄 Pagination detected - Total: ${json.recordsTotal || json.totalRecords}, Filtered: ${json.recordsFiltered}, Draw: ${json.draw}`,
@@ -344,7 +428,6 @@ class AuctionScraper {
             recordCount: recordCount,
           }
 
-          // Enhanced pagination detection
           if (
             json.recordsTotal ||
             json.recordsFiltered ||
@@ -373,11 +456,10 @@ class AuctionScraper {
     })
   }
 
-  // Enhanced function to extract all required data from table row - EXACT copy from your original code
+  // Enhanced function to extract all required data from table row
   async extractRowData(button) {
     try {
       const rowData = await button.evaluate((btn) => {
-        // Find the parent row (could be tr or tabulator row)
         const row = btn.closest("tr") || btn.closest(".tabulator-row") || btn.closest('[role="row"]')
         if (!row) {
           return { broker: null, lotNo: null, grade: null, sellingMark: null, error: "Row not found" }
@@ -386,6 +468,7 @@ class AuctionScraper {
         let lotNo = null
         let grade = null
         let sellingMark = null
+
         // Method 1: Try Tabulator structure
         const brokerCell = row.querySelector('[tabulator-field="Broker"]')
         const lotNoCell =
@@ -416,29 +499,26 @@ class AuctionScraper {
         if (!broker || !lotNo || !grade || !sellingMark) {
           const cells = row.querySelectorAll("td")
 
-          // Look for cells that might contain our data
           cells.forEach((cell) => {
             const cellText = cell.textContent?.trim()
             const cellClass = cell.className?.toLowerCase() || ""
             const cellTitle = cell.getAttribute("title")?.toLowerCase() || ""
 
-            // Try to identify broker cell
             if (!broker && (cellClass.includes("broker") || cellTitle.includes("broker"))) {
               broker = cellText
             }
 
-            // Try to identify lot number cell
             if (!lotNo && (cellClass.includes("lot") || cellTitle.includes("lot") || /^\d+$/.test(cellText))) {
               lotNo = cellText
             }
-            // Try to identify grade cell
+
             if (
               !grade &&
               (cellClass.includes("grade") || cellTitle.includes("grade") || /^[A-Z]{2,6}$/.test(cellText))
             ) {
               grade = cellText
             }
-            // Try to identify selling mark cell
+
             if (
               !sellingMark &&
               (cellClass.includes("selling") ||
@@ -454,8 +534,6 @@ class AuctionScraper {
         // Method 3: Column position based extraction (fallback)
         if (!broker || !lotNo || !grade || !sellingMark) {
           const allCells = Array.from(row.querySelectorAll("td, .tabulator-cell"))
-
-          // Look for column headers to determine positions
           const table = row.closest("table") || row.closest(".tabulator")
           if (table) {
             const headers = Array.from(table.querySelectorAll("th, .tabulator-col-title"))
@@ -496,7 +574,7 @@ class AuctionScraper {
           lotNo: lotNo,
           grade: grade,
           sellingMark: sellingMark,
-          rowHtml: row.outerHTML.substring(0, 500), // First 500 chars for debugging
+          rowHtml: row.outerHTML.substring(0, 500),
           cellCount: row.querySelectorAll("td, .tabulator-cell").length,
         }
       })
@@ -507,7 +585,7 @@ class AuctionScraper {
     }
   }
 
-  // Enhanced page size setting - EXACT copy from your original code
+  // Enhanced page size setting
   async setMaxPageSize() {
     try {
       const pageSizeSelectors = [
@@ -527,7 +605,6 @@ class AuctionScraper {
           this.log(`🔧 Found page size dropdown: ${selector}`)
           const options = await dropdown.$$("option")
 
-          // Try to find the largest page size option
           let maxValue = 0
           let maxOption = null
 
@@ -552,7 +629,6 @@ class AuctionScraper {
             const value = await maxOption.getAttribute("value")
             await dropdown.selectOption(value)
             this.log(`📄 Set page size to: ${value} (${await maxOption.textContent()})`)
-            // Wait for network to be idle after changing page size, more reliable than fixed timeout
             await this.page
               .waitForLoadState("networkidle", { timeout: 10000 })
               .catch(() => this.log("Timeout waiting for network idle after page size change."))
@@ -566,7 +642,7 @@ class AuctionScraper {
     return false
   }
 
-  // Enhanced button processing - EXACT copy from your original code
+  // Enhanced button processing
   async processButton(button, buttonIndex) {
     if (!this.isRunning) return
 
@@ -574,27 +650,22 @@ class AuctionScraper {
       this.processedButtons++
       this.log(`🔄 Processing button ${this.processedButtons} (Button index: ${buttonIndex})`)
 
-      // First, extract all data from the row
       this.log(`📝 Extracting row data...`)
       const rowData = await this.extractRowData(button)
       this.log(`📊 Row data extracted: ${JSON.stringify(rowData)}`, "info")
 
       await button.scrollIntoViewIfNeeded()
-      await this.page.waitForTimeout(100) // Reduced wait
+      await this.page.waitForTimeout(100)
 
-      // Track API calls before clicking
       const apiCallsBefore = this.apiCallCount
 
       await button.click()
-      // Wait for modal to appear, increased timeout for robustness
       await this.page.waitForSelector("#lotHistory", { timeout: 15000 })
 
-      // Wait for initial API calls related to modal content to complete
       await this.page
         .waitForLoadState("networkidle", { timeout: 5000 })
         .catch(() => this.log("Timeout waiting for network idle after modal open."))
 
-      // Update auction data with all extracted information
       const tempRowData = {
         broker: rowData.broker,
         lotNo: rowData.lotNo,
@@ -606,15 +677,13 @@ class AuctionScraper {
 
       // Check for modal pagination and handle it
       let modalPage = 1
-      const maxModalPages = 100 // Max pages for modal, can be adjusted
+      const maxModalPages = 100
 
       while (modalPage <= maxModalPages && this.isRunning) {
         this.log(`  📄 Processing modal page ${modalPage}...`)
 
-        // Wait for network to be idle after potential modal page load
         await this.page.waitForLoadState("networkidle", { timeout: 3000 }).catch(() => {})
 
-        // Look for next page in modal
         const nextModalSelectors = [
           "#lotHistory .next:not(.disabled)",
           "#lotHistory .paginate_button.next:not(.disabled)",
@@ -633,7 +702,6 @@ class AuctionScraper {
             if (!isDisabled) {
               this.log(`    ➡️ Clicking next page in modal...`)
               await nextBtn.click()
-              // Wait for network to be idle after clicking next page
               await this.page
                 .waitForLoadState("networkidle", { timeout: 5000 })
                 .catch(() => this.log("Timeout waiting for network idle after modal next click."))
@@ -657,7 +725,7 @@ class AuctionScraper {
         "#lotHistory .btn-close",
         "#lotHistory .modal-header .close",
         '#lotHistory button[data-dismiss="modal"]',
-        '#lotHistory [data-bs-dismiss="modal"]', // Bootstrap 5
+        '#lotHistory [data-bs-dismiss="modal"]',
       ]
 
       let modalClosed = false
@@ -665,7 +733,6 @@ class AuctionScraper {
         const closeBtn = await this.page.$(selector)
         if (closeBtn) {
           await closeBtn.click()
-          // Wait for modal to disappear
           await this.page
             .waitForSelector("#lotHistory", { state: "hidden", timeout: 5000 })
             .catch(() => this.log("Timeout waiting for modal to close."))
@@ -681,22 +748,19 @@ class AuctionScraper {
           .waitForSelector("#lotHistory", { state: "hidden", timeout: 3000 })
           .catch(() => this.log("Timeout waiting for modal to close after Escape."))
       }
-      // Small wait after closing modal to ensure page is stable
+
       await this.page.waitForTimeout(200)
 
       const apiCallsAfter = this.apiCallCount
       this.log(`    📊 API calls made for this button: ${apiCallsAfter - apiCallsBefore}`)
 
       // Associate row data with the most recently updated auction records
-      // Find auction records that were updated during this button click
       const recentlyUpdatedAuctions = Array.from(this.processedAuctionIds.entries()).filter(([id, data]) => {
         const updateTime = new Date(data.lastUpdated)
         const buttonClickTime = new Date(tempRowData.timestamp)
-        // Allow a slightly larger window for API responses to be captured
-        return updateTime >= new Date(buttonClickTime.getTime() - 5000) // Within 5 seconds
+        return updateTime >= new Date(buttonClickTime.getTime() - 5000)
       })
 
-      // Update the most recent auction record with all extracted data
       if (recentlyUpdatedAuctions.length > 0) {
         const [auctionId, auctionData] = recentlyUpdatedAuctions[recentlyUpdatedAuctions.length - 1]
         auctionData.broker = tempRowData.broker
@@ -711,7 +775,6 @@ class AuctionScraper {
         this.log(`       Grade: ${tempRowData.grade}`)
         this.log(`       SellingMark: ${tempRowData.sellingMark}`)
       } else {
-        // If no auction ID was captured, create a record with the row data
         const fallbackId = `button_${buttonIndex}_${Date.now()}`
         this.processedAuctionIds.set(fallbackId, {
           auctionId: fallbackId,
@@ -732,13 +795,11 @@ class AuctionScraper {
         this.log(`       SellingMark: ${tempRowData.sellingMark}`)
       }
 
-      // Mark button as processed
       await button.evaluate((btn) => (btn.dataset.processed = "true"))
       this.updateProgress()
     } catch (err) {
       this.log(`⚠️ Error processing button ${this.processedButtons}: ${err.message}`, "error")
 
-      // Attempt to close modal if an error occurred during processing
       try {
         await this.page.keyboard.press("Escape")
         await this.page.waitForTimeout(200)
@@ -758,7 +819,7 @@ class AuctionScraper {
     }
   }
 
-  // MAIN PROCESSING LOOP - EXACT copy from your original code
+  // MAIN PROCESSING LOOP
   async processAllButtons() {
     this.log("🔧 Setting maximum page size...")
     await this.setMaxPageSize()
@@ -767,8 +828,8 @@ class AuctionScraper {
 
     let scrollAttempts = 0
     let consecutiveNoNewButtons = 0
-    const maxScrollAttempts = 2000 // Increased significantly for very long pages
-    const maxConsecutiveNoNewButtons = 30 // Increased threshold
+    const maxScrollAttempts = 2000
+    const maxConsecutiveNoNewButtons = 30
     await this.page.evaluate(() => window.scrollTo(0, 0))
     await this.page
       .waitForLoadState("networkidle", { timeout: 5000 })
@@ -782,10 +843,8 @@ class AuctionScraper {
     ) {
       this.log(`📍 Scroll attempt ${scrollAttempts + 1} - Looking for unprocessed buttons...`)
 
-      // Get all buttons, including those that might have just loaded
       const allButtons = await this.page.$$("button.btn-tbl")
 
-      // Filter for unprocessed and visible buttons
       const unprocessedButtonInfos = await Promise.all(
         allButtons.map(async (btn, index) => {
           const isProcessed = await btn.evaluate((el) => el.dataset.processed === "true")
@@ -799,7 +858,7 @@ class AuctionScraper {
               rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) &&
               rect.right <= (window.innerWidth || document.documentElement.clientWidth)
             )
-          }) // More strict visibility check
+          })
           return {
             element: btn,
             index,
@@ -813,48 +872,42 @@ class AuctionScraper {
       this.log(`🔍 Found ${currentUnprocessedButtons.length} unprocessed visible buttons`)
       let buttonsProcessedInThisIteration = 0
 
-      // Process buttons in batches for better performance
-      const batchSize = this.config.batchSize || 5 // Process 5 buttons at a time
+      const batchSize = this.config.batchSize || 5
       for (let i = 0; i < currentUnprocessedButtons.length && this.isRunning; i += batchSize) {
         const batch = currentUnprocessedButtons.slice(i, i + batchSize)
 
         for (const buttonInfo of batch) {
           if (!this.isRunning || this.processedButtons >= this.config.maxButtons) break
 
-          // Re-select the button to ensure it's still valid after potential DOM changes
-          const button = allButtons[buttonInfo.index] // Use the original element handle
+          const button = allButtons[buttonInfo.index]
 
           if (button) {
             this.log(`🚀 Processing View button (Iteration button ${buttonInfo.index + 1})`)
             this.log(`📍 Button info: ${buttonInfo.text}`)
             await this.processButton(button, buttonInfo.index)
             buttonsProcessedInThisIteration++
-            // Minimal delay between buttons in a batch
             await this.page.waitForTimeout(100)
           }
         }
-        // Small delay between batches
         await this.page.waitForTimeout(300)
       }
       this.log(`✅ Processed ${buttonsProcessedInThisIteration} buttons in this iteration`)
       this.log(
         `📊 Total processed so far: ${this.processedButtons} buttons, ${this.processedAuctionIds.size} unique auctions`,
       )
-      // Check for progress
+
       if (buttonsProcessedInThisIteration === 0) {
         consecutiveNoNewButtons++
         this.log(`⏸️ No new buttons processed (${consecutiveNoNewButtons}/${maxConsecutiveNoNewButtons})`)
       } else {
-        consecutiveNoNewButtons = 0 // Reset if new buttons were processed
+        consecutiveNoNewButtons = 0
       }
 
-      // Scroll down to load more buttons
       const scrollResult = await this.page.evaluate(async () => {
         const beforeScroll = window.scrollY
-        window.scrollBy(0, window.innerHeight * 0.9) // Scroll almost a full viewport
+        window.scrollBy(0, window.innerHeight * 0.9)
 
-        // Check if we're at the bottom
-        const isAtBottom = window.innerHeight + window.scrollY >= document.body.scrollHeight - 50 // Reduced threshold
+        const isAtBottom = window.innerHeight + window.scrollY >= document.body.scrollHeight - 50
 
         return {
           scrolled: window.scrollY !== beforeScroll,
@@ -864,12 +917,11 @@ class AuctionScraper {
           viewportHeight: window.innerHeight,
         }
       })
-      // Wait for network to be idle after scrolling to allow new content to load
+
       await this.page
         .waitForLoadState("networkidle", { timeout: 5000 })
         .catch(() => this.log("Timeout waiting for network idle after scroll."))
 
-      // Try to trigger any "Load More" buttons
       let clickedLoadMore = false
       try {
         const loadMoreSelectors = [
@@ -879,35 +931,31 @@ class AuctionScraper {
           ".btn-load-more",
           '[data-action="load-more"]',
           ".pagination .next",
-          "a.next_page", // Common for pagination links
+          "a.next_page",
         ]
         for (const selector of loadMoreSelectors) {
           const loadMoreBtn = await this.page.$(selector)
           if (loadMoreBtn && (await loadMoreBtn.isVisible())) {
             await loadMoreBtn.click()
             this.log(`🔄 Clicked load more button: ${selector}`)
-            // Wait for network to be idle after clicking load more
             await this.page
               .waitForLoadState("networkidle", { timeout: 10000 })
               .catch(() => this.log("Timeout waiting for network idle after load more click."))
-            clickedLoadMore = true // Reset if load more button was clicked
-            consecutiveNoNewButtons = 0 // Reset if load more button was clicked
+            clickedLoadMore = true
+            consecutiveNoNewButtons = 0
             break
           }
         }
       } catch (e) {
-        // No load more button found or clickable
         this.log(`No clickable load more button found: ${e.message}`)
       }
 
-      // Break if we've reached the bottom and no new buttons are being processed, and no load more button was clicked
       if (scrollResult.isAtBottom && buttonsProcessedInThisIteration === 0 && !clickedLoadMore) {
         this.log("🏁 Reached bottom of page with no new buttons to process and no load more option.")
         break
       }
 
       scrollAttempts++
-      // Progress reporting every 10 attempts
       if (scrollAttempts % 10 === 0) {
         this.log(`🚀 Scroll Progress: ${scrollAttempts}/${maxScrollAttempts} attempts`)
         this.log(`📊 Processed: ${this.processedButtons} buttons | Unique auctions: ${this.processedAuctionIds.size}`)
@@ -922,7 +970,6 @@ class AuctionScraper {
     this.isRunning = false
     this.log("🛑 Stopping scraper and saving data...")
 
-    // Save data before cleanup
     try {
       const result = this.saveData()
       this.log("✅ Data saved successfully before stop!")
@@ -931,7 +978,7 @@ class AuctionScraper {
       this.log(`❌ Error saving data: ${error.message}`, "error")
     }
 
-    await this.cleanup()
+    this.resetForNextCategory()
   }
 
   async cleanup() {
@@ -939,6 +986,7 @@ class AuctionScraper {
       if (this.browser) {
         await this.browser.close()
         this.log("🔐 Browser closed successfully")
+        this.isInitialized = false
       }
     } catch (error) {
       this.log(`⚠️ Error closing browser: ${error.message}`, "warning")
