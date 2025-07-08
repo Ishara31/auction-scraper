@@ -1,6 +1,6 @@
 {
   "name": "auction-bid-history-scraper",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Desktop and web application for scraping auction bid history",
   "main": "src/main.js",
   "scripts": {
@@ -15,7 +15,13 @@
     "postinstall": "electron-builder install-app-deps",
     "dist": "npm run build"
   },
-  "keywords": ["auction", "scraper", "electron", "playwright", "web"],
+  "keywords": [
+    "auction",
+    "scraper",
+    "electron",
+    "playwright",
+    "web"
+  ],
   "author": "Your Name",
   "license": "MIT",
   "devDependencies": {
@@ -45,11 +51,15 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         },
         {
           "target": "portable",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "requestedExecutionLevel": "asInvoker",
@@ -71,7 +81,10 @@
       "target": [
         {
           "target": "dmg",
-          "arch": ["x64", "arm64"]
+          "arch": [
+            "x64",
+            "arm64"
+          ]
         }
       ],
       "category": "public.app-category.productivity"
@@ -80,7 +93,9 @@
       "target": [
         {
           "target": "AppImage",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "category": "Office"
