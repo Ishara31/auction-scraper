@@ -118,10 +118,23 @@ input[type="number"]:focus {
   cursor: pointer;
   font-weight: 600;
   transition: background-color 0.3s ease;
+  white-space: nowrap;
 }
 
-.directory-selector button:hover {
+.directory-selector button:hover:not(:disabled) {
   background: #2d3748;
+}
+
+.directory-selector button:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.help-text {
+  display: block;
+  margin-top: 5px;
+  color: #666;
+  font-size: 12px;
 }
 
 .control-buttons {
@@ -203,7 +216,7 @@ input[type="number"]:focus {
   box-shadow: 0 4px 15px rgba(56, 161, 105, 0.3);
 }
 
-.btn-continue-large:hover {
+.btn-continue-large:hover:not(:disabled) {
   background: linear-gradient(135deg, #2f855a 0%, #276749 100%);
   transform: translateY(-3px);
   box-shadow: 0 8px 25px rgba(56, 161, 105, 0.4);
@@ -211,6 +224,12 @@ input[type="number"]:focus {
 
 .btn-continue-large:active {
   transform: translateY(-1px);
+}
+
+.btn-continue-large:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .status-info {
@@ -352,4 +371,27 @@ input[type="checkbox"] {
 
 .log-container::-webkit-scrollbar-thumb:hover {
   background: #718096;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .control-buttons {
+    flex-direction: column;
+  }
+
+  .directory-selector {
+    flex-direction: column;
+  }
+
+  .status-info {
+    grid-template-columns: 1fr;
+  }
+
+  .results-summary {
+    grid-template-columns: 1fr;
+  }
 }
