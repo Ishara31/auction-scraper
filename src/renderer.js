@@ -72,6 +72,10 @@ class AuctionScraperUI {
     const result = await window.electronAPI.selectSaveDirectory()
     if (result.success) {
       this.saveDirectoryInput.value = result.path
+      this.addLogEntry({
+        type: "info",
+        message: `📁 Save directory selected: ${result.path}`,
+      })
     }
   }
 
@@ -132,6 +136,16 @@ class AuctionScraperUI {
   }
 
   async startNextCategory() {
+    // Validate that a save directory is selected for the new category
+    const saveDirectory = this.saveDirectoryInput.value.trim()
+    if (!saveDirectory) {
+      this.addLogEntry({
+        type: "error",
+        message: "Please select a save directory for the next category",
+      })
+      return
+    }
+
     this.addLogEntry({ type: "info", message: "🔄 Starting next category extraction..." })
 
     // Update button to show it's processing
@@ -143,7 +157,7 @@ class AuctionScraperUI {
 
     const config = {
       auctionUrl: this.auctionUrlInput.value.trim(),
-      saveDirectory: this.saveDirectoryInput.value.trim(),
+      saveDirectory: saveDirectory,
       maxButtons: Number.parseInt(this.maxButtonsInput.value) || 1000,
       batchSize: Number.parseInt(this.batchSizeInput.value) || 5,
       headless: this.headlessModeCheckbox.checked,
@@ -153,6 +167,10 @@ class AuctionScraperUI {
       const result = await window.electronAPI.startScraping(config)
       if (result.success) {
         this.addLogEntry({ type: "success", message: "✅ Next category extraction started!" })
+        this.addLogEntry({
+          type: "info",
+          message: `📁 Data will be saved to: ${saveDirectory}`,
+        })
       }
     } catch (error) {
       this.addLogEntry({ type: "error", message: `Error starting next category: ${error.message}` })
@@ -230,13 +248,15 @@ class AuctionScraperUI {
     this.startButton.disabled = isActive
     this.stopButton.disabled = !isActive
 
-    // Disable form inputs during scraping
+    // Keep form inputs enabled during scraping so user can change save directory for next category
     this.auctionUrlInput.disabled = isActive
-    this.saveDirectoryInput.disabled = isActive
     this.maxButtonsInput.disabled = isActive
     this.batchSizeInput.disabled = isActive
     this.headlessModeCheckbox.disabled = isActive
-    this.selectDirectoryButton.disabled = isActive
+
+    // IMPORTANT: Keep save directory and browse button enabled for next category selection
+    this.saveDirectoryInput.disabled = false
+    this.selectDirectoryButton.disabled = false
 
     // Update status
     if (!isActive) {
@@ -284,9 +304,22 @@ class AuctionScraperUI {
     this.currentStatusSpan.className = "status-complete"
 
     this.addLogEntry({ type: "success", message: "✅ Category scraping completed successfully!" })
+
     this.addLogEntry({
       type: "info",
-      message: "🔄 Browser is still open. Select another category and click Continue to scrape more data.",
+      message: "🔄 Browser is still open. You can now:",
+    })
+    this.addLogEntry({
+      type: "info",
+      message: "   1. Select a new save directory (optional - or keep current one)",
+    })
+    this.addLogEntry({
+      type: "info",
+      message: "   2. Select another category in the browser",
+    })
+    this.addLogEntry({
+      type: "info",
+      message: "   3. Click 'Continue with Next Category' to start scraping",
     })
 
     // Show results
@@ -304,6 +337,10 @@ class AuctionScraperUI {
     this.continueButton.textContent = "✅ Continue with Next Category"
     this.continueButton.disabled = false
     this.isNextCategory = true // Set flag for next category
+
+    // Ensure save directory controls remain enabled
+    this.saveDirectoryInput.disabled = false
+    this.selectDirectoryButton.disabled = false
 
     // Reset progress for next category after a short delay
     setTimeout(() => {
