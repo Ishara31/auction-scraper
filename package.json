@@ -1,6 +1,6 @@
 {
   "name": "auction-bid-history-scraper",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Desktop and web application for scraping auction bid history",
   "main": "src/main.js",
   "scripts": {
