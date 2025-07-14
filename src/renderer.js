@@ -2,7 +2,18 @@ class AuctionScraperUI {
   constructor() {
     this.isScrapingActive = false
     this.isWaitingForUser = false
-    this.isNextCategory = false
+    this.currentCategoryIndex = 0
+    this.categories = [
+      "Leafy",
+      "Tippy",
+      "Semi Leafy",
+      "Premium Flowery",
+      "BOP1A",
+      "Ex-estate",
+      "High and Medium",
+      "Off Grade",
+      "Dust",
+    ]
     this.initializeElements()
     this.setupEventListeners()
     this.setupIPCListeners()
@@ -15,6 +26,10 @@ class AuctionScraperUI {
     this.maxButtonsInput = document.getElementById("maxButtons")
     this.batchSizeInput = document.getElementById("batchSize")
     this.headlessModeCheckbox = document.getElementById("headlessMode")
+
+    // Set default values to requested amounts
+    this.maxButtonsInput.value = "2500"
+    this.batchSizeInput.value = "10"
 
     // Control buttons
     this.startButton = document.getElementById("startScraping")
@@ -96,21 +111,34 @@ class AuctionScraperUI {
       return
     }
 
+    // Reset category index for new scraping session
+    this.currentCategoryIndex = 0
+
     const config = {
       auctionUrl,
       saveDirectory,
-      maxButtons: Number.parseInt(this.maxButtonsInput.value) || 1000,
-      batchSize: Number.parseInt(this.batchSizeInput.value) || 5,
+      maxButtons: Number.parseInt(this.maxButtonsInput.value) || 2500,
+      batchSize: Number.parseInt(this.batchSizeInput.value) || 10,
       headless: this.headlessModeCheckbox.checked,
     }
 
     this.isScrapingActive = true
-    this.isNextCategory = false
-    // Show continue section immediately when scraping starts
+    this.isWaitingForUser = false
+
+    // Show continue section for initial setup only
     this.continueSection.style.display = "block"
     this.addLogEntry({
       type: "info",
-      message: "🌐 Browser will open shortly. Complete login and search, then click Continue below.",
+      message:
+        "🌐 Browser will open shortly. Complete login, select Year/Catalogue/FIRST Auction, click SEARCH, then click Continue.",
+    })
+    this.addLogEntry({
+      type: "info",
+      message: `📋 Will process first auction manually, then automatically process remaining ${this.categories.length - 1} auctions: ${this.categories.slice(1).join(", ")}`,
+    })
+    this.addLogEntry({
+      type: "info",
+      message: `⚙️ Settings: ${config.maxButtons} max buttons, batch size ${config.batchSize}`,
     })
     this.updateScrapingState(true)
     this.addLogEntry({ type: "info", message: "Starting scraping process..." })
@@ -126,65 +154,18 @@ class AuctionScraperUI {
   }
 
   async handleContinueClick() {
-    if (this.isNextCategory) {
-      // This is for starting next category
-      await this.startNextCategory()
-    } else {
-      // This is for continuing current extraction
-      await this.userContinue()
-    }
-  }
-
-  async startNextCategory() {
-    // Validate that a save directory is selected for the new category
-    const saveDirectory = this.saveDirectoryInput.value.trim()
-    if (!saveDirectory) {
-      this.addLogEntry({
-        type: "error",
-        message: "Please select a save directory for the next category",
-      })
-      return
-    }
-
-    this.addLogEntry({ type: "info", message: "🔄 Starting next category extraction..." })
-
-    // Update button to show it's processing
-    this.continueButton.textContent = "⏳ Starting Next Category..."
-    this.continueButton.disabled = true
-
-    // Reset the next category flag
-    this.isNextCategory = false
-
-    const config = {
-      auctionUrl: this.auctionUrlInput.value.trim(),
-      saveDirectory: saveDirectory,
-      maxButtons: Number.parseInt(this.maxButtonsInput.value) || 1000,
-      batchSize: Number.parseInt(this.batchSizeInput.value) || 5,
-      headless: this.headlessModeCheckbox.checked,
-    }
-
-    try {
-      const result = await window.electronAPI.startScraping(config)
-      if (result.success) {
-        this.addLogEntry({ type: "success", message: "✅ Next category extraction started!" })
-        this.addLogEntry({
-          type: "info",
-          message: `📁 Data will be saved to: ${saveDirectory}`,
-        })
-      }
-    } catch (error) {
-      this.addLogEntry({ type: "error", message: `Error starting next category: ${error.message}` })
-      this.continueButton.textContent = "✅ Continue with Next Category"
-      this.continueButton.disabled = false
-      this.isNextCategory = true
-    }
+    // This is only for the initial setup - after that it's fully automated
+    await this.userContinue()
   }
 
   async userContinue() {
-    this.addLogEntry({ type: "info", message: "🚀 User confirmed! Starting automatic extraction..." })
+    this.addLogEntry({
+      type: "info",
+      message: `🚀 Starting automated processing of all ${this.categories.length} auctions...`,
+    })
 
     // Update button to show it's processing
-    this.continueButton.textContent = "⏳ Starting..."
+    this.continueButton.textContent = "⏳ Starting Automation..."
     this.continueButton.disabled = true
 
     try {
@@ -192,36 +173,39 @@ class AuctionScraperUI {
       if (result.success) {
         this.isWaitingForUser = false
         this.continueSection.style.display = "none"
-        this.currentStatusSpan.textContent = "Processing"
+        this.currentStatusSpan.textContent = "Processing Auctions"
         this.currentStatusSpan.className = "status-running"
-        this.addLogEntry({ type: "success", message: "✅ Automatic button clicking started!" })
+        this.addLogEntry({ type: "success", message: "✅ Automated auction processing started!" })
       }
     } catch (error) {
-      this.addLogEntry({ type: "error", message: `Error continuing: ${error.message}` })
+      this.addLogEntry({ type: "error", message: `Error starting automation: ${error.message}` })
       this.continueButton.textContent = "✅ Continue Extraction"
       this.continueButton.disabled = false
     }
   }
 
   handleWaitingForUser() {
-    this.isWaitingForUser = true
-    this.continueSection.style.display = "block"
-    this.currentStatusSpan.textContent = "Waiting for User"
-    this.currentStatusSpan.className = "status-running"
+    // Only show waiting for user on the very first setup
+    if (this.currentCategoryIndex === 0) {
+      this.isWaitingForUser = true
+      this.continueSection.style.display = "block"
+      this.currentStatusSpan.textContent = "Waiting for Manual Setup"
+      this.currentStatusSpan.className = "status-running"
 
-    // Reset continue button state
-    if (this.isNextCategory) {
-      this.continueButton.textContent = "✅ Continue Extraction"
-    } else {
-      this.continueButton.textContent = "✅ Continue Extraction"
+      this.continueButton.textContent = "✅ Start Automated Processing"
+      this.continueButton.disabled = false
+
+      this.addLogEntry({
+        type: "success",
+        message:
+          "✅ Browser ready! Complete login, select Year/Catalogue/FIRST Auction, click SEARCH, then click 'Start Automated Processing'.",
+      })
+      this.addLogEntry({
+        type: "info",
+        message:
+          "📋 After clicking, system will capture first auction data, then automatically switch to remaining 8 auctions.",
+      })
     }
-    this.continueButton.disabled = false
-
-    this.addLogEntry({
-      type: "success",
-      message:
-        "✅ Browser ready! Complete your category selection and search steps, then click the Continue button below.",
-    })
   }
 
   async stopScraping() {
@@ -240,7 +224,7 @@ class AuctionScraperUI {
 
     this.isScrapingActive = false
     this.isWaitingForUser = false
-    this.isNextCategory = false
+    this.currentCategoryIndex = 0
     this.updateScrapingState(false)
   }
 
@@ -248,15 +232,13 @@ class AuctionScraperUI {
     this.startButton.disabled = isActive
     this.stopButton.disabled = !isActive
 
-    // Keep form inputs enabled during scraping so user can change save directory for next category
+    // Disable form inputs during scraping
     this.auctionUrlInput.disabled = isActive
     this.maxButtonsInput.disabled = isActive
     this.batchSizeInput.disabled = isActive
     this.headlessModeCheckbox.disabled = isActive
-
-    // IMPORTANT: Keep save directory and browse button enabled for next category selection
-    this.saveDirectoryInput.disabled = false
-    this.selectDirectoryButton.disabled = false
+    this.saveDirectoryInput.disabled = isActive
+    this.selectDirectoryButton.disabled = isActive
 
     // Update status
     if (!isActive) {
@@ -297,65 +279,63 @@ class AuctionScraperUI {
   }
 
   handleScrapingComplete(result) {
-    // Don't set isScrapingActive to false - keep it active for next category
-    this.isWaitingForUser = false
+    // Increment category index after completion
+    this.currentCategoryIndex++
 
-    this.currentStatusSpan.textContent = "Category Complete - Ready for Next"
-    this.currentStatusSpan.className = "status-complete"
-
-    this.addLogEntry({ type: "success", message: "✅ Category scraping completed successfully!" })
+    const completedCategory = this.categories[this.currentCategoryIndex - 1] || "auction"
+    const nextCategory = this.categories[this.currentCategoryIndex]
 
     this.addLogEntry({
-      type: "info",
-      message: "🔄 Browser is still open. You can now:",
-    })
-    this.addLogEntry({
-      type: "info",
-      message: "   1. Select a new save directory (optional - or keep current one)",
-    })
-    this.addLogEntry({
-      type: "info",
-      message: "   2. Select another category in the browser",
-    })
-    this.addLogEntry({
-      type: "info",
-      message: "   3. Click 'Continue with Next Category' to start scraping",
+      type: "success",
+      message: `✅ Auction "${completedCategory}" completed! (${this.currentCategoryIndex}/${this.categories.length})`,
     })
 
-    // Show results
+    // Show results for completed category
     this.resultsSection.style.display = "block"
     this.totalRecordsSpan.textContent = result.totalRecords || 0
     this.excelFileSpan.textContent = result.excelFile || "N/A"
     this.jsonFileSpan.textContent = result.jsonFile || "N/A"
 
-    // Update progress to 100%
+    // Update progress to 100% for current category
     this.progressFill.style.width = "100%"
     this.progressText.textContent = "100%"
 
-    // Show continue section for next category
-    this.continueSection.style.display = "block"
-    this.continueButton.textContent = "✅ Continue with Next Category"
-    this.continueButton.disabled = false
-    this.isNextCategory = true // Set flag for next category
+    // Check if there are more categories to process
+    if (this.currentCategoryIndex < this.categories.length) {
+      this.addLogEntry({
+        type: "info",
+        message: `🔄 Automatically starting next auction: "${nextCategory}" (${this.currentCategoryIndex + 1}/${this.categories.length})`,
+      })
 
-    // Ensure save directory controls remain enabled
-    this.saveDirectoryInput.disabled = false
-    this.selectDirectoryButton.disabled = false
+      this.currentStatusSpan.textContent = `Processing ${nextCategory}`
+      this.currentStatusSpan.className = "status-running"
 
-    // Reset progress for next category after a short delay
-    setTimeout(() => {
-      this.progressFill.style.width = "0%"
-      this.progressText.textContent = "0%"
-      this.buttonsProcessedSpan.textContent = "0"
-      this.apiCallsSpan.textContent = "0"
-      this.uniqueAuctionsSpan.textContent = "0"
-    }, 3000)
+      // Reset progress for next category
+      setTimeout(() => {
+        this.progressFill.style.width = "0%"
+        this.progressText.textContent = "0%"
+        this.buttonsProcessedSpan.textContent = "0"
+        this.apiCallsSpan.textContent = "0"
+        this.uniqueAuctionsSpan.textContent = "0"
+      }, 2000)
+    } else {
+      // All categories completed
+      this.addLogEntry({
+        type: "success",
+        message: "🎉 All 9 auctions completed! Scraping session finished.",
+      })
+      this.addLogEntry({
+        type: "info",
+        message: "You can now close the browser or start a new scraping session.",
+      })
+      this.stopScraping()
+    }
   }
 
   handleScrapingError(error) {
     this.isScrapingActive = false
     this.isWaitingForUser = false
-    this.isNextCategory = false
+    this.currentCategoryIndex = 0
     this.updateScrapingState(false)
 
     this.currentStatusSpan.textContent = "Error"
